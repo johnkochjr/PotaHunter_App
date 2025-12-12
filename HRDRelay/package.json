@@ -1,0 +1,11 @@
+{
+  "name": "hrd-relay",
+  "version": "1.0.0",
+  "description": "HTTP to TCP relay for Ham Radio Deluxe",
+  "main": "relay.js",
+  "scripts": {
+    "start": "node relay.js"
+  },
+  "author": "",
+  "license": "MIT"
+}
