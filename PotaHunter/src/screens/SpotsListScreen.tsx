@@ -20,6 +20,8 @@ import { SpotWithUserData, getBand, formatFrequency } from '../types/spot';
 import { fetchSpotsWithUserData } from '../services/api';
 import { sendToHRD, logQSOToHRD } from '../services/hrdService';
 import { reSpotActivator } from '../services/potaService';
+import { saveToInternalLog } from '../services/internalLogService';
+import { markSpotAsHunted, getHuntedSpotIds } from '../services/huntedSpotsService';
 
 interface SpotsListScreenProps {
   onOpenSettings: () => void;
@@ -36,10 +38,14 @@ export const SpotsListScreen: React.FC<SpotsListScreenProps> = ({ onOpenSettings
   // Filter state
   const [bandFilter, setBandFilter] = useState<string>('all');
   const [modeFilter, setModeFilter] = useState<string>('all');
+  const [hideHunted, setHideHunted] = useState<boolean>(false);
 
   // Log modal state
   const [logModalVisible, setLogModalVisible] = useState(false);
   const [spotToLog, setSpotToLog] = useState<SpotWithUserData | null>(null);
+
+  // Hunted spots tracking
+  const [huntedSpotIds, setHuntedSpotIds] = useState<Set<number>>(new Set());
 
   // Mock hunted parks - in real app, load from storage
   const [huntedParks] = useState<Set<string>>(
@@ -49,6 +55,11 @@ export const SpotsListScreen: React.FC<SpotsListScreenProps> = ({ onOpenSettings
   // Filter spots based on selected filters
   const filteredSpots = useMemo(() => {
     return spots.filter(spot => {
+      // Hide hunted filter
+      if (hideHunted && huntedSpotIds.has(spot.spotId)) {
+        return false;
+      }
+
       // Band filter
       if (bandFilter !== 'all') {
         const spotBand = getBand(spot.frequency);
@@ -74,7 +85,7 @@ export const SpotsListScreen: React.FC<SpotsListScreenProps> = ({ onOpenSettings
 
       return true;
     });
-  }, [spots, bandFilter, modeFilter]);
+  }, [spots, bandFilter, modeFilter, hideHunted, huntedSpotIds]);
 
   const loadSpots = async (isRefresh = false) => {
     try {
@@ -85,6 +96,10 @@ export const SpotsListScreen: React.FC<SpotsListScreenProps> = ({ onOpenSettings
 
       const data = await fetchSpotsWithUserData(huntedParks);
       setSpots(data);
+
+      // Load hunted spot IDs
+      const hunted = await getHuntedSpotIds();
+      setHuntedSpotIds(hunted);
     } catch (err) {
       setError('Failed to load spots. Pull to refresh.');
       console.error(err);
@@ -140,59 +155,102 @@ export const SpotsListScreen: React.FC<SpotsListScreenProps> = ({ onOpenSettings
   };
 
   const handleLogSubmit = async (qsoData: QSOData) => {
-    if (!hrdSettings.enabled) {
-      Alert.alert(
-        'HRD Not Enabled',
-        'Enable Ham Radio Deluxe control in Settings to log QSOs.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: onOpenSettings },
-        ]
-      );
-      return;
+    let loggedToHRD = false;
+    let hrdErrorMessage = '';
+
+    // Try to log to HRD if enabled
+    if (hrdSettings.enabled) {
+      const result = await logQSOToHRD(hrdSettings, {
+        callsign: qsoData.callsign,
+        frequency: qsoData.frequency,
+        mode: qsoData.mode,
+        rstSent: qsoData.rstSent,
+        rstReceived: qsoData.rstReceived,
+        comment: qsoData.comment,
+        parkReference: qsoData.parkReference,
+        myCallsign: hrdSettings.myCallsign,
+      });
+
+      if (result.success) {
+        loggedToHRD = true;
+      } else {
+        hrdErrorMessage = result.message;
+      }
     }
 
-    const result = await logQSOToHRD(hrdSettings, {
+    // Save to internal log as backup or if HRD failed
+    const internalLogResult = await saveToInternalLog({
       callsign: qsoData.callsign,
+      parkReference: qsoData.parkReference,
       frequency: qsoData.frequency,
       mode: qsoData.mode,
       rstSent: qsoData.rstSent,
       rstReceived: qsoData.rstReceived,
       comment: qsoData.comment,
-      parkReference: qsoData.parkReference,
       myCallsign: hrdSettings.myCallsign,
+      parkName: spotToLog?.name,
+      locationDesc: spotToLog?.locationDesc,
+      savedReason: !hrdSettings.enabled 
+        ? 'relay-unavailable' 
+        : loggedToHRD 
+          ? 'manual' 
+          : 'hrd-error',
     });
 
-    if (result.success) {
-      // If a comment was provided, also submit a re-spot to POTA
-      if (qsoData.comment.trim()) {
-        const reSpotResult = await reSpotActivator(
-          qsoData.callsign,
-          qsoData.parkReference,
-          qsoData.frequency,
-          qsoData.mode,
-          hrdSettings.myCallsign,
-          qsoData.comment
-        );
+    // Handle re-spot if comment was provided
+    let reSpotMessage = '';
+    if (qsoData.comment.trim()) {
+      const reSpotResult = await reSpotActivator(
+        qsoData.callsign,
+        qsoData.parkReference,
+        qsoData.frequency,
+        qsoData.mode,
+        hrdSettings.myCallsign,
+        qsoData.comment
+      );
 
-        if (reSpotResult.success) {
-          Alert.alert('QSO Logged & Re-Spotted', `${result.message}\n\n${reSpotResult.message}`);
-        } else {
-          // QSO logged but re-spot failed
-          Alert.alert(
-            'QSO Logged',
-            `${result.message}\n\nRe-spot failed: ${reSpotResult.message}`
-          );
-        }
-      } else {
-        Alert.alert('QSO Logged', result.message);
+      if (reSpotResult.success) {
+        reSpotMessage = reSpotResult.message;
       }
+    }
+
+    // Show appropriate message based on what succeeded
+    if (loggedToHRD && internalLogResult.success) {
+      const messages = [`QSO logged to HRD and saved locally`];
+      if (reSpotMessage) {
+        messages.push(reSpotMessage);
+      }
+      Alert.alert('QSO Logged', messages.join('\n\n'));
+    } else if (loggedToHRD && !internalLogResult.success) {
+      Alert.alert('QSO Logged to HRD', `Logged to HRD but local save failed.\n\n${reSpotMessage || ''}`);
+    } else if (!loggedToHRD && internalLogResult.success) {
+      const messages = [
+        hrdSettings.enabled 
+          ? `HRD unavailable: ${hrdErrorMessage}\n\nQSO saved to internal log for later export.` 
+          : 'QSO saved to internal log.\n\nEnable HRD in settings to log directly to your radio.'
+      ];
+      if (reSpotMessage) {
+        messages.push(reSpotMessage);
+      }
+      Alert.alert('Saved to Internal Log', messages.join('\n\n'));
     } else {
-      Alert.alert('Log Failed', result.message, [
+      // Both failed
+      const errorMsg = [
+        hrdSettings.enabled ? `HRD Error: ${hrdErrorMessage}` : 'HRD is disabled',
+        `Internal log error: ${internalLogResult.message}`
+      ].join('\n\n');
+      
+      Alert.alert('Log Failed', errorMsg, [
         { text: 'OK' },
         { text: 'Settings', onPress: onOpenSettings },
       ]);
-      throw new Error(result.message);
+      throw new Error('Both HRD and internal log failed');
+    }
+
+    // Mark spot as hunted
+    if (spotToLog) {
+      await markSpotAsHunted(spotToLog.spotId, spotToLog.activator, spotToLog.reference);
+      setHuntedSpotIds(prev => new Set([...prev, spotToLog.spotId]));
     }
   };
 
@@ -333,6 +391,8 @@ export const SpotsListScreen: React.FC<SpotsListScreenProps> = ({ onOpenSettings
         modeFilter={modeFilter}
         onBandChange={setBandFilter}
         onModeChange={setModeFilter}
+        hideHunted={hideHunted}
+        onHideHuntedChange={setHideHunted}
         resultCount={filteredSpots.length}
       />
       <FlatList
@@ -341,6 +401,7 @@ export const SpotsListScreen: React.FC<SpotsListScreenProps> = ({ onOpenSettings
         renderItem={({ item }) => (
           <SpotCard
             spot={item}
+            isHunted={huntedSpotIds.has(item.spotId)}
             onPress={handleSpotPress}
             onReSpot={handleReSpot}
             onLog={handleLog}

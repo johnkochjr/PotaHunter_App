@@ -3,8 +3,9 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { SettingsProvider } from './src/context/SettingsContext';
 import { SpotsListScreen } from './src/screens/SpotsListScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { InternalLogsScreen } from './src/screens/InternalLogsScreen';
 
-type Screen = 'spots' | 'settings';
+type Screen = 'spots' | 'settings' | 'logs';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('spots');
@@ -14,8 +15,13 @@ export default function App() {
       <SettingsProvider>
         {currentScreen === 'spots' ? (
           <SpotsListScreen onOpenSettings={() => setCurrentScreen('settings')} />
+        ) : currentScreen === 'settings' ? (
+          <SettingsScreen 
+            onBack={() => setCurrentScreen('spots')} 
+            onOpenLogs={() => setCurrentScreen('logs')}
+          />
         ) : (
-          <SettingsScreen onBack={() => setCurrentScreen('spots')} />
+          <InternalLogsScreen onBack={() => setCurrentScreen('settings')} />
         )}
       </SettingsProvider>
     </ThemeProvider>

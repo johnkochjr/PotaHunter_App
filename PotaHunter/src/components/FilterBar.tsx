@@ -7,6 +7,7 @@ import {
   Modal,
   FlatList,
   Pressable,
+  Switch,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -210,6 +211,8 @@ interface FilterBarProps {
   modeFilter: string;
   onBandChange: (band: string) => void;
   onModeChange: (mode: string) => void;
+  hideHunted: boolean;
+  onHideHuntedChange: (hide: boolean) => void;
   resultCount?: number;
 }
 
@@ -218,18 +221,37 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   modeFilter,
   onBandChange,
   onModeChange,
+  hideHunted,
+  onHideHuntedChange,
   resultCount,
 }) => {
   const { theme } = useTheme();
 
   const styles = StyleSheet.create({
     container: {
-      flexDirection: 'row',
-      paddingHorizontal: 12,
-      paddingVertical: 8,
       backgroundColor: theme.background,
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
+    },
+    filtersRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    hideHuntedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: theme.surface,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    hideHuntedLabel: {
+      fontSize: 14,
+      color: theme.text,
+      fontWeight: '500',
     },
     resultCount: {
       fontSize: 12,
@@ -241,8 +263,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   });
 
   return (
-    <View>
-      <View style={styles.container}>
+    <View style={styles.container}>
+      <View style={styles.filtersRow}>
         <FilterDropdown
           label="Band"
           value={bandFilter}
@@ -256,7 +278,16 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           onSelect={onModeChange}
         />
       </View>
-      {resultCount !== undefined && (bandFilter !== 'all' || modeFilter !== 'all') && (
+      <View style={styles.hideHuntedRow}>
+        <Text style={styles.hideHuntedLabel}>Hide Hunted Spots</Text>
+        <Switch
+          value={hideHunted}
+          onValueChange={onHideHuntedChange}
+          trackColor={{ false: theme.border, true: theme.primaryLight }}
+          thumbColor={hideHunted ? theme.primary : theme.surfaceVariant}
+        />
+      </View>
+      {resultCount !== undefined && (bandFilter !== 'all' || modeFilter !== 'all' || hideHunted) && (
         <Text style={styles.resultCount}>
           Showing {resultCount} spot{resultCount !== 1 ? 's' : ''}
         </Text>

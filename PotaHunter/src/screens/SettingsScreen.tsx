@@ -18,9 +18,10 @@ import { testHRDConnection } from '../services/hrdService';
 
 interface SettingsScreenProps {
   onBack: () => void;
+  onOpenLogs: () => void;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onOpenLogs }) => {
   const { theme, themeName, setTheme, availableThemes } = useTheme();
   const { hrdSettings, updateHRDSettings } = useSettings();
 
@@ -331,6 +332,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
           <Text style={styles.statusText}>
             Run the HRD Relay server (node relay.js) on your PC alongside HRD
           </Text>
+        </View>
+
+        {/* Internal Logs */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Internal Logs</Text>
+          
+          <Text style={styles.statusText}>
+            View and export QSOs saved locally when HRD relay is unavailable
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.button, { marginTop: 16 }]}
+            onPress={onOpenLogs}
+          >
+            <Text style={styles.buttonText}>View Internal Logs</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Theme Settings */}

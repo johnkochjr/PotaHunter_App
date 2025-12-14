@@ -20,12 +20,13 @@ import {
 
 interface SpotCardProps {
   spot: SpotWithUserData;
+  isHunted?: boolean;
   onPress?: (spot: SpotWithUserData) => void;
   onReSpot?: (spot: SpotWithUserData) => void;
   onLog?: (spot: SpotWithUserData) => void;
 }
 
-export const SpotCard: React.FC<SpotCardProps> = ({ spot, onPress, onReSpot, onLog }) => {
+export const SpotCard: React.FC<SpotCardProps> = ({ spot, isHunted = false, onPress, onReSpot, onLog }) => {
   const { theme } = useTheme();
 
   const styles = StyleSheet.create({
@@ -41,7 +42,8 @@ export const SpotCard: React.FC<SpotCardProps> = ({ spot, onPress, onReSpot, onL
       shadowRadius: 4,
       elevation: 3,
       borderLeftWidth: 4,
-      borderLeftColor: spot.isHunted ? theme.hunted : theme.primary,
+      borderLeftColor: isHunted ? theme.hunted : (spot.isHunted ? theme.hunted : theme.primary),
+      opacity: isHunted ? 0.7 : 1,
     },
     header: {
       flexDirection: 'row',
@@ -173,6 +175,26 @@ export const SpotCard: React.FC<SpotCardProps> = ({ spot, onPress, onReSpot, onL
       fontWeight: '600',
       fontSize: 14,
     },
+    loggedBadge: {
+      position: 'absolute',
+      top: 2,
+      right: -4,
+      backgroundColor: theme.hunted,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    loggedBadgeText: {
+      color: theme.textOnPrimary,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
   });
 
   const band = getBand(spot.frequency);
@@ -184,10 +206,17 @@ export const SpotCard: React.FC<SpotCardProps> = ({ spot, onPress, onReSpot, onL
       onPress={() => onPress?.(spot)}
       android_ripple={{ color: theme.primaryLight }}
     >
+      {/* Logged badge for hunted spots */}
+      {(isHunted || spot.isHunted) && (
+        <View style={styles.loggedBadge}>
+          <Text style={styles.loggedBadgeText}>LOGGED</Text>
+        </View>
+      )}
+
       {/* Header: Hunted indicator, Callsign, Reference, Mode */}
       <View style={styles.header}>
         <View style={styles.huntedIndicator}>
-          {spot.isHunted ? (
+          {(isHunted || spot.isHunted) ? (
             <HuntedIcon size={28} color={theme.hunted} />
           ) : (
             <NotHuntedIcon size={28} color={theme.notHunted} />
