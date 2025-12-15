@@ -11,9 +11,16 @@ const RelayServer = require('./relay-server');
 const store = new Store({
   defaults: {
     httpPort: 7810,
+    radioControl: 'none',
     hrdHost: '127.0.0.1',
     hrdPort: 7809,
+    flrigHost: '127.0.0.1',
+    flrigPort: 12345,
+    loggingMode: 'none',
+    hrdLogHost: '127.0.0.1',
     hrdLogbookPort: 2333,
+    n1mmHost: '127.0.0.1',
+    n1mmPort: 12060,
     autoStart: false,
     minimizeToTray: true,
   }
@@ -115,7 +122,7 @@ function createTray() {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip('HRD Relay - Stopped');
+  tray.setToolTip('POTA Relay - Stopped');
   
   tray.on('click', () => {
     mainWindow.show();
@@ -167,16 +174,23 @@ function updateTrayMenu(running) {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip(`HRD Relay - ${running ? 'Running' : 'Stopped'}`);
+  tray.setToolTip(`POTA Relay - ${running ? 'Running' : 'Stopped'}`);
 }
 
 // Initialize relay server
 function initializeRelay() {
   const config = {
     httpPort: store.get('httpPort'),
+    radioControl: store.get('radioControl'),
     hrdHost: store.get('hrdHost'),
     hrdPort: store.get('hrdPort'),
+    flrigHost: store.get('flrigHost'),
+    flrigPort: store.get('flrigPort'),
+    loggingMode: store.get('loggingMode'),
+    hrdLogHost: store.get('hrdLogHost'),
     hrdLogbookPort: store.get('hrdLogbookPort'),
+    n1mmHost: store.get('n1mmHost'),
+    n1mmPort: store.get('n1mmPort'),
   };
 
   console.log('[Main] Initializing relay server with config:', config);
@@ -264,11 +278,32 @@ ipcMain.handle('get-server-status', () => {
 
 ipcMain.handle('test-hrd-connection', async () => {
   try {
-    const frequency = await relayServer.sendHRDCommand('get frequency');
-    return { 
-      success: true, 
-      message: `HRD responding, frequency: ${frequency}`,
-      frequency 
+    const radioControl = store.get('radioControl');
+    
+    if (radioControl === 'none') {
+      return {
+        success: true,
+        message: 'No radio control configured - logging only mode'
+      };
+    }
+    
+    if (radioControl === 'hrd') {
+      const frequency = await relayServer.sendHRDCommand('get frequency');
+      return { 
+        success: true, 
+        message: `HRD responding, frequency: ${frequency}`,
+        frequency 
+      };
+    }
+    
+    if (radioControl === 'flrig') {
+      const result = await relayServer.testFLRIGConnection();
+      return result;
+    }
+    
+    return {
+      success: false,
+      message: 'Unknown radio control mode'
     };
   } catch (err) {
     return { 
@@ -288,10 +323,10 @@ app.whenReady().then(() => {
   const { Menu } = require('electron');
   const template = [
     {
-      label: 'HRD Relay',
+      label: 'POTA Relay',
       submenu: [
         {
-          label: 'About HRD Relay',
+          label: 'About POTA Relay',
           role: 'about'
         },
         { type: 'separator' },

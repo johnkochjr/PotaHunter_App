@@ -1,12 +1,14 @@
 /**
- * HRD Relay Server Module
- * Extracted from relay.js for use in Electron app
+ * POTA Relay Server Module
+ * Supports HRD, FLRIG, and logging-only modes
  */
 
 const http = require('http');
 const net = require('net');
 const dgram = require('dgram');
 const EventEmitter = require('events');
+const FLRIGClient = require('./flrig-client');
+const N1MMLogger = require('./n1mm-logger');
 
 // HRD Protocol constants
 const MAGIC1 = 0x1234ABCD;
@@ -18,13 +20,33 @@ class RelayServer extends EventEmitter {
     
     this.config = {
       httpPort: config.httpPort || 7810,
+      radioControl: config.radioControl || 'none',
       hrdHost: config.hrdHost || '127.0.0.1',
       hrdPort: config.hrdPort || 7809,
+      loggingMode: config.loggingMode || 'none',
+      hrdLogHost: config.hrdLogHost || '127.0.0.1',
       hrdLogbookPort: config.hrdLogbookPort || 2333,
+      n1mmHost: config.n1mmHost || '127.0.0.1',
+      n1mmPort: config.n1mmPort || 12060,
+      flrigHost: config.flrigHost || '127.0.0.1',
+      flrigPort: config.flrigPort || 12345,
     };
     
     this.httpServer = null;
     this.isRunning = false;
+    this.flrigClient = null;
+    this.n1mmLogger = null;
+    
+    // Initialize FLRIG client if needed
+    if (this.config.radioControl === 'flrig') {
+      this.flrigClient = new FLRIGClient(this.config.flrigHost, this.config.flrigPort);
+    }
+    
+    // Initialize N1MM logger if needed
+    if (this.config.loggingMode === 'n1mm') {
+      this.n1mmLogger = new N1MMLogger(this.config.n1mmHost, this.config.n1mmPort);
+    }
+    
     this.stats = {
       requestCount: 0,
       errorCount: 0,
@@ -203,23 +225,46 @@ class RelayServer extends EventEmitter {
     this.emit('log', { type: 'info', message: 'Test connection request' });
 
     try {
-      const frequency = await this.sendHRDCommand('get frequency');
-      this.emit('log', { type: 'success', message: `HRD responding, frequency: ${frequency}` });
+      if (this.config.radioControl === 'none') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: 'Logging only mode - no radio control configured',
+        }));
+        return;
+      }
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        success: true,
-        message: 'HRD connected',
-        frequency: frequency,
-      }));
+      if (this.config.radioControl === 'hrd') {
+        const frequency = await this.sendHRDCommand('get frequency');
+        this.emit('log', { type: 'success', message: `HRD responding, frequency: ${frequency}` });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: 'HRD connected',
+          frequency: frequency,
+        }));
+        return;
+      }
+
+      if (this.config.radioControl === 'flrig') {
+        const result = await this.testFLRIGConnection();
+        this.emit('log', { type: 'success', message: result.message });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+        return;
+      }
+
+      throw new Error('Unknown radio control mode');
     } catch (err) {
       this.stats.errorCount++;
-      this.emit('log', { type: 'error', message: `HRD connection failed: ${err.message}` });
+      this.emit('log', { type: 'error', message: `Connection failed: ${err.message}` });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: false,
-        message: `HRD error: ${err.message}`,
+        message: `Error: ${err.message}`,
       }));
     }
   }
@@ -240,19 +285,55 @@ class RelayServer extends EventEmitter {
           message: `Setting frequency: ${frequency} Hz, mode: ${mode}` 
         });
 
-        await this.sendHRDCommand(`set frequency-hz ${frequency}`);
-        await this.sendHRDCommand(`set mode ${mode}`);
+        if (this.config.radioControl === 'none') {
+          this.emit('log', { 
+            type: 'info', 
+            message: 'Logging only mode - radio control skipped' 
+          });
 
-        this.emit('log', { 
-          type: 'success', 
-          message: `Tuned to ${(frequency / 1000000).toFixed(6)} MHz ${mode}` 
-        });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            message: `Logged: ${(frequency / 1000000).toFixed(6)} MHz ${mode} (no radio control)`,
+          }));
+          return;
+        }
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          success: true,
-          message: `Tuned to ${(frequency / 1000000).toFixed(6)} MHz ${mode}`,
-        }));
+        if (this.config.radioControl === 'hrd') {
+          await this.sendHRDCommand(`set frequency-hz ${frequency}`);
+          await this.sendHRDCommand(`set mode ${mode}`);
+
+          this.emit('log', { 
+            type: 'success', 
+            message: `HRD tuned to ${(frequency / 1000000).toFixed(6)} MHz ${mode}` 
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            message: `Tuned to ${(frequency / 1000000).toFixed(6)} MHz ${mode}`,
+          }));
+          return;
+        }
+
+        if (this.config.radioControl === 'flrig') {
+          await this.flrigClient.setFrequency(frequency);
+          await this.flrigClient.setMode(mode);
+
+          this.emit('log', { 
+            type: 'success', 
+            message: `FLRIG tuned to ${(frequency / 1000000).toFixed(6)} MHz ${mode}` 
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            message: `Tuned to ${(frequency / 1000000).toFixed(6)} MHz ${mode}`,
+          }));
+          return;
+        }
+
+        throw new Error('Unknown radio control mode');
       } catch (err) {
         this.stats.errorCount++;
         this.emit('log', { type: 'error', message: `Frequency set failed: ${err.message}` });
@@ -282,35 +363,99 @@ class RelayServer extends EventEmitter {
           message: `Logging QSO: ${qsoData.callsign} on ${qsoData.band}` 
         });
 
-        const adifString = this.buildADIFString(qsoData);
-        const udpClient = dgram.createSocket('udp4');
-        const message = Buffer.from(adifString, 'utf8');
+        // Route to appropriate logging backend
+        if (this.config.loggingMode === 'none') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            message: 'Logging disabled',
+          }));
+          return;
+        }
 
-        udpClient.send(message, this.config.hrdLogbookPort, this.config.hrdHost, (err) => {
-          udpClient.close();
+        if (this.config.loggingMode === 'hrd') {
+          // HRD Logbook UDP logging
+          const adifString = this.buildADIFString(qsoData);
+          const udpClient = dgram.createSocket('udp4');
+          const message = Buffer.from(adifString, 'utf8');
 
-          if (err) {
-            this.stats.errorCount++;
-            this.emit('log', { type: 'error', message: `Log failed: ${err.message}` });
+          udpClient.send(message, this.config.hrdLogbookPort, this.config.hrdLogHost, (err) => {
+            udpClient.close();
 
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              success: false,
-              message: `UDP error: ${err.message}`,
-            }));
-          } else {
+            if (err) {
+              this.stats.errorCount++;
+              this.emit('log', { type: 'error', message: `HRD Log failed: ${err.message}` });
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                success: false,
+                message: `HRD UDP error: ${err.message}`,
+              }));
+            } else {
+              this.emit('log', { 
+                type: 'success', 
+                message: `QSO logged to HRD: ${qsoData.callsign}` 
+              });
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                success: true,
+                message: 'QSO logged to HRD Logbook',
+              }));
+            }
+          });
+          return;
+        }
+
+        if (this.config.loggingMode === 'n1mm') {
+          // N1MM Logger+ UDP logging
+          if (!this.n1mmLogger) {
+            this.n1mmLogger = new N1MMLogger(this.config.n1mmHost, this.config.n1mmPort);
+          }
+
+          // Convert qsoData to N1MM format
+          const n1mmQSO = {
+            myCall: qsoData.my_call || '',
+            theirCall: qsoData.callsign,
+            frequency: parseFloat(qsoData.frequency) * 1000000, // MHz to Hz
+            mode: qsoData.mode,
+            rstSent: qsoData.rst_sent,
+            rstReceived: qsoData.rst_rcvd,
+            park: qsoData.sig_info || '',
+            gridSquare: qsoData.gridsquare || '',
+            name: qsoData.name || '',
+            comment: qsoData.comment || '',
+            operator: qsoData.operator || qsoData.my_call || '',
+            station: qsoData.station_callsign || '',
+          };
+
+          try {
+            await this.n1mmLogger.sendContact(n1mmQSO);
+            
             this.emit('log', { 
               type: 'success', 
-              message: `QSO logged: ${qsoData.callsign}` 
+              message: `QSO logged to N1MM: ${qsoData.callsign}` 
             });
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
               success: true,
-              message: 'QSO logged to HRD',
+              message: 'QSO logged to N1MM Logger+',
+            }));
+          } catch (err) {
+            this.stats.errorCount++;
+            this.emit('log', { type: 'error', message: `N1MM Log failed: ${err.message}` });
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: false,
+              message: `N1MM error: ${err.message}`,
             }));
           }
-        });
+          return;
+        }
+
+        throw new Error('Unknown logging mode');
       } catch (err) {
         this.stats.errorCount++;
         this.emit('log', { type: 'error', message: `Log parse failed: ${err.message}` });
@@ -407,12 +552,52 @@ class RelayServer extends EventEmitter {
     if (wasRunning) {
       return this.stop().then(() => {
         this.config = { ...this.config, ...newConfig };
+        
+        // Reinitialize FLRIG client if radio control changed to flrig
+        if (this.config.radioControl === 'flrig') {
+          this.flrigClient = new FLRIGClient(this.config.flrigHost, this.config.flrigPort);
+        } else {
+          this.flrigClient = null;
+        }
+        
+        // Reinitialize N1MM logger if logging mode changed to n1mm
+        if (this.config.loggingMode === 'n1mm') {
+          this.n1mmLogger = new N1MMLogger(this.config.n1mmHost, this.config.n1mmPort);
+        } else if (this.n1mmLogger) {
+          this.n1mmLogger.close();
+          this.n1mmLogger = null;
+        }
+        
         return this.start();
       });
     } else {
       this.config = { ...this.config, ...newConfig };
+      
+      // Reinitialize FLRIG client if radio control changed to flrig
+      if (this.config.radioControl === 'flrig') {
+        this.flrigClient = new FLRIGClient(this.config.flrigHost, this.config.flrigPort);
+      } else {
+        this.flrigClient = null;
+      }
+      
+      // Reinitialize N1MM logger if logging mode changed to n1mm
+      if (this.config.loggingMode === 'n1mm') {
+        this.n1mmLogger = new N1MMLogger(this.config.n1mmHost, this.config.n1mmPort);
+      } else if (this.n1mmLogger) {
+        this.n1mmLogger.close();
+        this.n1mmLogger = null;
+      }
+      
       return Promise.resolve();
     }
+  }
+  
+  // Test FLRIG connection
+  async testFLRIGConnection() {
+    if (!this.flrigClient) {
+      this.flrigClient = new FLRIGClient(this.config.flrigHost, this.config.flrigPort);
+    }
+    return await this.flrigClient.test();
   }
 }
 

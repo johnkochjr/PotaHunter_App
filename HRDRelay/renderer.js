@@ -24,6 +24,14 @@ const settingsForm = document.getElementById('settingsForm');
 const ipAddress = document.getElementById('ipAddress');
 const portNumber = document.getElementById('portNumber');
 
+const radioControlSelect = document.getElementById('radioControl');
+const hrdSettingsDiv = document.getElementById('hrdSettings');
+const flrigSettingsDiv = document.getElementById('flrigSettings');
+
+const loggingModeSelect = document.getElementById('loggingMode');
+const hrdLogSettingsDiv = document.getElementById('hrdLogSettings');
+const n1mmSettingsDiv = document.getElementById('n1mmSettings');
+
 let uptimeInterval = null;
 let serverStartTime = null;
 
@@ -44,13 +52,33 @@ async function loadSettings() {
   const settings = await electronAPI.getSettings();
   
   document.getElementById('httpPort').value = settings.httpPort || 7810;
+  document.getElementById('radioControl').value = settings.radioControl || 'none';
+  document.getElementById('loggingMode').value = settings.loggingMode || 'none';
+  
+  // HRD settings
   document.getElementById('hrdHost').value = settings.hrdHost || '127.0.0.1';
   document.getElementById('hrdPort').value = settings.hrdPort || 7809;
-  document.getElementById('hrdLogbookPort').value = settings.hrdLogbookPort || 2333;
+  
+  // FLRIG settings
+  document.getElementById('flrigHost').value = settings.flrigHost || '127.0.0.1';
+  document.getElementById('flrigPort').value = settings.flrigPort || 12345;
+  
+  // HRD Logbook settings
+  document.getElementById('hrdLogHost').value = settings.hrdLogHost || '127.0.0.1';
+  document.getElementById('hrdLogbookPort').value = settings.hrdLogbookPort || 2233;
+  
+  // N1MM settings
+  document.getElementById('n1mmHost').value = settings.n1mmHost || '127.0.0.1';
+  document.getElementById('n1mmPort').value = settings.n1mmPort || 12060;
+  
   document.getElementById('autoStart').checked = settings.autoStart || false;
   document.getElementById('minimizeToTray').checked = settings.minimizeToTray !== false;
   
   portNumber.textContent = settings.httpPort || 7810;
+  
+  // Show appropriate settings sections
+  updateRadioSettingsVisibility(settings.radioControl || 'none');
+  updateLoggingSettingsVisibility(settings.loggingMode || 'none');
 }
 
 // Update server status
@@ -120,6 +148,16 @@ function stopUptimeCounter() {
 
 // Event listeners
 function setupEventListeners() {
+  // Radio control mode change
+  radioControlSelect.addEventListener('change', (e) => {
+    updateRadioSettingsVisibility(e.target.value);
+  });
+  
+  // Logging mode change
+  loggingModeSelect.addEventListener('change', (e) => {
+    updateLoggingSettingsVisibility(e.target.value);
+  });
+  
   startBtn.addEventListener('click', async () => {
     console.log('[Renderer] Start button clicked');
     addLog('info', 'Starting server...');
@@ -155,20 +193,27 @@ function setupEventListeners() {
   });
   
   testBtn.addEventListener('click', async () => {
-    addLog('info', 'Testing HRD connection...');
+    const radioControl = document.getElementById('radioControl').value;
+    
+    if (radioControl === 'none') {
+      addLog('info', 'No radio control software selected - logging only mode');
+      return;
+    }
+    
+    addLog('info', `Testing ${radioControl.toUpperCase()} connection...`);
     testBtn.disabled = true;
     testBtn.textContent = 'Testing...';
     
-    const result = await electronAPI.testHRDConnection();
+    const result = await electronAPI.testConnection();
     
     if (result.success) {
       addLog('success', result.message);
     } else {
-      addLog('error', `HRD test failed: ${result.message}`);
+      addLog('error', `Connection test failed: ${result.message}`);
     }
     
     testBtn.disabled = false;
-    testBtn.textContent = 'Test HRD Connection';
+    testBtn.textContent = 'Test Connection';
   });
   
   clearLogBtn.addEventListener('click', () => {
@@ -185,13 +230,32 @@ function setupEventListeners() {
   });
 }
 
+// Update visibility of radio settings based on mode
+function updateRadioSettingsVisibility(mode) {
+  hrdSettingsDiv.style.display = mode === 'hrd' ? 'block' : 'none';
+  flrigSettingsDiv.style.display = mode === 'flrig' ? 'block' : 'none';
+}
+
+// Update visibility of logging settings based on mode
+function updateLoggingSettingsVisibility(mode) {
+  hrdLogSettingsDiv.style.display = mode === 'hrd' ? 'block' : 'none';
+  n1mmSettingsDiv.style.display = mode === 'n1mm' ? 'block' : 'none';
+}
+
 // Save settings
 async function saveSettings() {
   const settings = {
     httpPort: parseInt(document.getElementById('httpPort').value),
+    radioControl: document.getElementById('radioControl').value,
     hrdHost: document.getElementById('hrdHost').value,
     hrdPort: parseInt(document.getElementById('hrdPort').value),
+    flrigHost: document.getElementById('flrigHost').value,
+    flrigPort: parseInt(document.getElementById('flrigPort').value),
+    loggingMode: document.getElementById('loggingMode').value,
+    hrdLogHost: document.getElementById('hrdLogHost').value,
     hrdLogbookPort: parseInt(document.getElementById('hrdLogbookPort').value),
+    n1mmHost: document.getElementById('n1mmHost').value,
+    n1mmPort: parseInt(document.getElementById('n1mmPort').value),
     autoStart: document.getElementById('autoStart').checked,
     minimizeToTray: document.getElementById('minimizeToTray').checked,
   };
@@ -210,9 +274,16 @@ async function saveSettings() {
 async function applySettings() {
   const config = {
     httpPort: parseInt(document.getElementById('httpPort').value),
+    radioControl: document.getElementById('radioControl').value,
     hrdHost: document.getElementById('hrdHost').value,
     hrdPort: parseInt(document.getElementById('hrdPort').value),
+    flrigHost: document.getElementById('flrigHost').value,
+    flrigPort: parseInt(document.getElementById('flrigPort').value),
+    loggingMode: document.getElementById('loggingMode').value,
+    hrdLogHost: document.getElementById('hrdLogHost').value,
     hrdLogbookPort: parseInt(document.getElementById('hrdLogbookPort').value),
+    n1mmHost: document.getElementById('n1mmHost').value,
+    n1mmPort: parseInt(document.getElementById('n1mmPort').value),
   };
   
   addLog('info', 'Applying settings...');
@@ -225,6 +296,16 @@ async function applySettings() {
   } else {
     addLog('error', `Failed to apply settings: ${result.error}`);
   }
+}
+
+// Update radio settings visibility
+function updateRadioSettingsVisibility(mode) {
+  hrdSettingsDiv.style.display = mode === 'hrd' ? 'block' : 'none';
+  flrigSettingsDiv.style.display = mode === 'flrig' ? 'block' : 'none';
+  
+  // Update test button text
+  const testBtnText = mode === 'none' ? 'Test Connection' : `Test ${mode.toUpperCase()} Connection`;
+  testBtn.textContent = testBtnText;
 }
 
 // Handle log entries from main process

@@ -15,8 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getServerStatus: () => ipcRenderer.invoke('get-server-status'),
   updateServerConfig: (config) => ipcRenderer.invoke('update-server-config', config),
   
-  // HRD testing
-  testHRDConnection: () => ipcRenderer.invoke('test-hrd-connection'),
+  // Radio control testing
+  testConnection: () => ipcRenderer.invoke('test-hrd-connection'),
   
   // Event listeners
   onLogEntry: (callback) => ipcRenderer.on('log-entry', (event, data) => callback(data)),

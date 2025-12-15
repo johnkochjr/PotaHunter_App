@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src *;">
-  <title>HRD Relay Server</title>
+  <title>POTA Relay Server</title>
   <link rel="stylesheet" href="renderer.css">
 </head>
 <body>
   <div class="container">
     <!-- Header -->
     <header>
-      <h1>🛰️ HRD Relay Server</h1>
+      <h1>🛰️ POTA Relay Server</h1>
       <div class="status-badge" id="statusBadge">Stopped</div>
     </header>
 
@@ -44,22 +44,94 @@
               <small>Port for the HTTP relay server (default: 7810)</small>
             </div>
             <div class="form-group">
-              <label for="hrdHost">HRD Host:</label>
-              <input type="text" id="hrdHost" name="hrdHost" value="127.0.0.1">
-              <small>HRD server IP address (default: 127.0.0.1)</small>
+              <label for="radioControl">Radio Control Software:</label>
+              <select id="radioControl" name="radioControl">
+                <option value="none">None (No Radio Control)</option>
+                <option value="hrd">Ham Radio Deluxe</option>
+                <option value="flrig">FLRIG</option>
+              </select>
+              <small>Choose your radio control software</small>
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="hrdPort">HRD Control Port:</label>
-              <input type="number" id="hrdPort" name="hrdPort" min="1024" max="65535" value="7809">
-              <small>HRD TCP control port (default: 7809)</small>
+              <label for="loggingMode">Logging Software:</label>
+              <select id="loggingMode" name="loggingMode">
+                <option value="none">None (No Logging)</option>
+                <option value="hrd">HRD Logbook</option>
+                <option value="n1mm">N1MM Logger+</option>
+              </select>
+              <small>Choose your logging software (independent of radio control)</small>
             </div>
-            <div class="form-group">
-              <label for="hrdLogbookPort">HRD Logbook Port:</label>
-              <input type="number" id="hrdLogbookPort" name="hrdLogbookPort" min="1024" max="65535" value="2333">
-              <small>HRD UDP logbook port (default: 2333)</small>
+            <div class="form-group"></div>
+          </div>
+
+          <!-- HRD Settings (shown when HRD is selected) -->
+          <div id="hrdSettings" class="radio-settings" style="display: none;">
+            <h3>Ham Radio Deluxe Settings</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="hrdHost">HRD Host:</label>
+                <input type="text" id="hrdHost" name="hrdHost" value="127.0.0.1">
+                <small>HRD server IP address (default: 127.0.0.1)</small>
+              </div>
+              <div class="form-group">
+                <label for="hrdPort">HRD Control Port:</label>
+                <input type="number" id="hrdPort" name="hrdPort" min="1024" max="65535" value="7809">
+                <small>HRD TCP control port (default: 7809)</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- FLRIG Settings (shown when FLRIG is selected) -->
+          <div id="flrigSettings" class="radio-settings" style="display: none;">
+            <h3>FLRIG Settings</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="flrigHost">FLRIG Host:</label>
+                <input type="text" id="flrigHost" name="flrigHost" value="127.0.0.1">
+                <small>FLRIG server IP address (default: 127.0.0.1)</small>
+              </div>
+              <div class="form-group">
+                <label for="flrigPort">FLRIG XML-RPC Port:</label>
+                <input type="number" id="flrigPort" name="flrigPort" min="1024" max="65535" value="12345">
+                <small>FLRIG XML-RPC port (default: 12345)</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- HRD Logbook Settings (shown when HRD logging is selected) -->
+          <div id="hrdLogSettings" class="radio-settings" style="display: none;">
+            <h3>HRD Logbook Settings</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="hrdLogHost">HRD Logbook Host:</label>
+                <input type="text" id="hrdLogHost" name="hrdLogHost" value="127.0.0.1">
+                <small>HRD Logbook IP address (default: 127.0.0.1)</small>
+              </div>
+              <div class="form-group">
+                <label for="hrdLogbookPort">HRD Logbook Port:</label>
+                <input type="number" id="hrdLogbookPort" name="hrdLogbookPort" min="1024" max="65535" value="2233">
+                <small>HRD UDP logbook port (default: 2233)</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- N1MM Settings (shown when N1MM logging is selected) -->
+          <div id="n1mmSettings" class="radio-settings" style="display: none;">
+            <h3>N1MM Logger+ Settings</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="n1mmHost">N1MM Host:</label>
+                <input type="text" id="n1mmHost" name="n1mmHost" value="127.0.0.1">
+                <small>N1MM Logger+ IP address (default: 127.0.0.1)</small>
+              </div>
+              <div class="form-group">
+                <label for="n1mmPort">N1MM UDP Port:</label>
+                <input type="number" id="n1mmPort" name="n1mmPort" min="1024" max="65535" value="12060">
+                <small>N1MM contactreplace UDP port (default: 12060)</small>
+              </div>
             </div>
           </div>
 
