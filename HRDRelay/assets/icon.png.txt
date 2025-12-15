@@ -1,0 +1,9 @@
+This is a placeholder for the app icon.
+To add a real icon, replace this file with a 512x512 PNG image named icon.png
+
+You can create one using:
+- macOS: Icon Set Creator or other icon tools
+- Online: Use a service like https://www.figma.com or https://www.canva.com
+- Design tip: Use a radio/antenna/signal wave theme
+
+For now, Electron will use the default icon.

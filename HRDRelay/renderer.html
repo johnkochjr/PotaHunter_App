@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src *;">
+  <title>HRD Relay Server</title>
+  <link rel="stylesheet" href="renderer.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>🛰️ HRD Relay Server</h1>
+      <div class="status-badge" id="statusBadge">Stopped</div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+      <!-- Control Panel -->
+      <section class="card">
+        <h2>Server Control</h2>
+        <div class="control-group">
+          <button id="startBtn" class="btn btn-primary">Start Server</button>
+          <button id="stopBtn" class="btn btn-secondary" disabled>Stop Server</button>
+          <button id="testBtn" class="btn btn-secondary">Test HRD Connection</button>
+        </div>
+        <div id="serverInfo" class="info-box">
+          <p><strong>Status:</strong> <span id="serverStatus">Stopped</span></p>
+          <p><strong>Requests:</strong> <span id="requestCount">0</span></p>
+          <p><strong>Errors:</strong> <span id="errorCount">0</span></p>
+          <p><strong>Uptime:</strong> <span id="uptime">--</span></p>
+        </div>
+      </section>
+
+      <!-- Settings Panel -->
+      <section class="card">
+        <h2>Settings</h2>
+        <form id="settingsForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="httpPort">HTTP Port:</label>
+              <input type="number" id="httpPort" name="httpPort" min="1024" max="65535" value="7810">
+              <small>Port for the HTTP relay server (default: 7810)</small>
+            </div>
+            <div class="form-group">
+              <label for="hrdHost">HRD Host:</label>
+              <input type="text" id="hrdHost" name="hrdHost" value="127.0.0.1">
+              <small>HRD server IP address (default: 127.0.0.1)</small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="hrdPort">HRD Control Port:</label>
+              <input type="number" id="hrdPort" name="hrdPort" min="1024" max="65535" value="7809">
+              <small>HRD TCP control port (default: 7809)</small>
+            </div>
+            <div class="form-group">
+              <label for="hrdLogbookPort">HRD Logbook Port:</label>
+              <input type="number" id="hrdLogbookPort" name="hrdLogbookPort" min="1024" max="65535" value="2333">
+              <small>HRD UDP logbook port (default: 2333)</small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" id="autoStart" name="autoStart">
+                <span>Auto-start server when app launches</span>
+              </label>
+            </div>
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" id="minimizeToTray" name="minimizeToTray" checked>
+                <span>Minimize to system tray</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+            <button type="button" id="applyBtn" class="btn btn-secondary">Apply Without Restart</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Activity Log -->
+      <section class="card">
+        <h2>Activity Log</h2>
+        <div class="log-controls">
+          <button id="clearLogBtn" class="btn btn-small">Clear Log</button>
+        </div>
+        <div id="activityLog" class="activity-log">
+          <p class="log-entry log-info">📋 Waiting for activity...</p>
+        </div>
+      </section>
+
+      <!-- Connection Info -->
+      <section class="card info-card">
+        <h3>📱 Connect from PotaHunter App</h3>
+        <div class="connection-info">
+          <p>To connect your app to this relay:</p>
+          <ol>
+            <li>Ensure your phone and this computer are on the same WiFi network</li>
+            <li>In the PotaHunter app, go to <strong>Settings</strong></li>
+            <li>Enable <strong>HRD Integration</strong></li>
+            <li>Enter this computer's IP address: <code id="ipAddress">Loading...</code></li>
+            <li>Enter port: <code id="portNumber">7810</code></li>
+            <li>Tap <strong>Test Connection</strong></li>
+          </ol>
+          <p class="tip">💡 <strong>Tip:</strong> If you're in a park without WiFi, create a hotspot on your Mac or phone!</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

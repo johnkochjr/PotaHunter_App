@@ -1,11 +1,42 @@
 {
   "name": "hrd-relay",
-  "version": "1.0.0",
-  "description": "HTTP to TCP relay for Ham Radio Deluxe",
-  "main": "relay.js",
+  "version": "2.0.0",
+  "description": "HTTP to TCP relay for Ham Radio Deluxe with GUI",
+  "main": "main.js",
   "scripts": {
-    "start": "node relay.js"
+    "start": "electron .",
+    "start-cli": "node relay.js",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.potahunter.hrdrelay",
+    "productName": "HRD Relay",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "assets/icon.png"
+    },
+    "win": {
+      "icon": "assets/icon.png"
+    },
+    "files": [
+      "main.js",
+      "relay-server.js",
+      "preload.js",
+      "renderer.html",
+      "renderer.css",
+      "renderer.js",
+      "assets/**/*"
+    ]
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
 }
